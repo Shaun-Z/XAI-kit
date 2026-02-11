@@ -1,0 +1,6 @@
+[submodule "modules/Quantus"]
+	path = modules/Quantus
+	url = https://github.com/Shaun-Z/Quantus.git
+[submodule "modules/captum"]
+	path = modules/captum
+	url = https://github.com/Shaun-Z/captum.git

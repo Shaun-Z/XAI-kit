@@ -6,9 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "captum",
-    "quantus",
+    "datasets>=4.5.0",
+    "ipykernel>=7.2.0",
+    "quantus[torch,transformers]",
+    "seaborn>=0.13.2",
+    "torchvision>=0.25.0",
 ]
 
 [tool.uv.sources]
-captum = { path = "../captum", editable = true }
-quantus = { path = "../Quantus", editable = true }
+quantus = { path = "./modules/Quantus", editable = true }
+captum = { path = "./modules/captum", editable = true }
