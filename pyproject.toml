@@ -1,0 +1,14 @@
+[project]
+name = "xai-kit"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "captum",
+    "quantus",
+]
+
+[tool.uv.sources]
+captum = { path = "../captum", editable = true }
+quantus = { path = "../Quantus", editable = true }
