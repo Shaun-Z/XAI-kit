@@ -8,6 +8,7 @@ dependencies = [
     "captum",
     "datasets>=4.5.0",
     "ipykernel>=7.2.0",
+    "medmnist>=3.0.2",
     "quantus[torch,transformers]",
     "seaborn>=0.13.2",
     "torchvision>=0.25.0",
