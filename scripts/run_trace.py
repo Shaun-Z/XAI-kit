@@ -6,7 +6,7 @@ import sys
 
 import open_clip
 import torch
-from PIL import Image
+from torchvision.datasets import ImageNet
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -16,14 +16,12 @@ if str(SRC_ROOT) not in sys.path:
 from clip_circuit.hooks import register_clip_vit_hooks
 
 
-IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Collect CLIP ViT trace for circuit analysis.')
     parser.add_argument('--model', default='ViT-B-16')
     parser.add_argument('--pretrained', default='openai')
-    parser.add_argument('--image-dir', type=Path, default=Path('examples'))
+    parser.add_argument('--imagenet-root', type=Path, required=True)
+    parser.add_argument('--split', choices=['train', 'val'], default='val')
     parser.add_argument('--target-layer', type=int, required=True)
     parser.add_argument('--next-attn-layer', type=int, required=True)
     parser.add_argument('--max-images', type=int, default=32)
@@ -31,11 +29,14 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def list_images(image_dir: Path, max_images: int) -> list[Path]:
-    if not image_dir.exists():
-        return []
-    files = [p for p in sorted(image_dir.rglob('*')) if p.suffix.lower() in IMAGE_EXTS]
-    return files[:max_images]
+def get_imagenet_id(dataset: ImageNet, index: int) -> str:
+    if hasattr(dataset, 'samples') and index < len(dataset.samples):
+        sample_path = Path(dataset.samples[index][0])
+        try:
+            return str(sample_path.relative_to(dataset.root))
+        except ValueError:
+            return str(sample_path)
+    return f'index:{index}'
 
 
 def main() -> None:
@@ -45,9 +46,13 @@ def main() -> None:
     model, _, preprocess = open_clip.create_model_and_transforms(args.model, pretrained=args.pretrained)
     model = model.to(device).eval()
 
-    image_paths = list_images(args.image_dir, args.max_images)
-    if not image_paths:
-        raise SystemExit(f'No images found in {args.image_dir}.')
+    if not args.imagenet_root.exists():
+        raise SystemExit(f'ImageNet root does not exist: {args.imagenet_root}')
+
+    dataset = ImageNet(root=str(args.imagenet_root), split=args.split)
+    if len(dataset) == 0:
+        raise SystemExit(f'ImageNet split is empty: root={args.imagenet_root}, split={args.split}')
+    limit = min(args.max_images, len(dataset))
 
     store = register_clip_vit_hooks(model, args.target_layer, args.next_attn_layer)
 
@@ -57,8 +62,9 @@ def main() -> None:
     attn_logits_l1: list[torch.Tensor] = []
 
     with torch.no_grad():
-        for path in image_paths:
-            image = Image.open(path).convert('RGB')
+        for idx in range(limit):
+            image, _ = dataset[idx]
+            image = image.convert('RGB')
             pixel_values = preprocess(image).unsqueeze(0).to(device)
             store.clear()
             _ = model.encode_image(pixel_values)
@@ -66,7 +72,7 @@ def main() -> None:
             if store.h_l is None or store.ffn_gate_l is None or store.attn_logits_l1 is None:
                 continue
 
-            images.append(str(path))
+            images.append(get_imagenet_id(dataset, idx))
             h_l.append(store.h_l)
             ffn_gate_l.append(store.ffn_gate_l)
             attn_logits_l1.append(store.attn_logits_l1)
